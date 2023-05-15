@@ -1,0 +1,85 @@
+#1. Create a new namespace named stage-app which will be hosting all the resources
+
+kubectl create namespace stage-app
+
+#2. Verify if the namespace is created. Ensure you see stage-app in the list.
+
+kubectl get ns
+
+#Setting a New Default Namespace
+
+#1.  Display the list of current context. Verify if there is a namespace that is set.
+
+kubectl config get-contexts
+
+#2.  Set the namespace to stage-app in your context.
+
+kubectl config set-context --current --namespace=stage-app
+
+3. Display the list of current context. Verify if you can see the "stage-app" under the NAMESPACE.
+
+#kubectl config get-contexts
+
+
+Create a Deployment
+
+#1. Create a new deployment based on nginx image and 2 replica sets.
+
+kubectl create deployment app-deployment --image=nginx --replicas=2
+
+#2. Check the deployment status.
+
+kubectl get deployment
+
+#3. Display the list of pods. Verify if 2 pods are running.
+
+kubectl get pods
+
+#Scaling Deployments
+#Scale the Deployment and verify if new Pods are created based on the specifications.
+
+#1. Scale the deployment from 2 replicas to 5 replicas.
+
+kubectl scale deployment/app-deployment --replicas=5
+
+#2. Check the deployment status.
+
+kubectl get deployment
+
+#3. Verify the number of Pods. There should be a total of 5 Pods that are running.
+
+kubectl get pods
+
+#Test Rolling Update and Roll Back functionality of Deployments
+
+#1. Set a new image for the deployment. Change it from nginx image to httpd.
+
+kubectl set image deployment/app-deployment nginx=httpd
+
+#2. Verify if new Pods are created.
+
+kubectl get pods
+
+#3. Set a new image for the deployment. This time add an image name that does not exist so that we can test the failure scenario.
+
+kubectl set image deployment/app-deployment nginx=a423sdg
+
+#4. Display the list of Pods. You should see that there are 3 Pods created that have failed (in the ImagePullBackOff state).
+
+kubectl get pods
+
+#5. Rollback the changes to the previous working version.
+
+kubectl rollout undo deployment/app-deployment
+
+#6. Display the list of Pods. You should see that all 5 Pods are now actively running.
+
+#7. Manually delete a specific Pod from the deployment to verify if deployment detects and auto-creates a new Pod. Make sure to replace the pod-name in the below command.
+
+kubectl delete pod <pod-name>
+
+kubectl get tpods
+
+#8. Display the list of Pods. You should see that a new pod (last in the list) has been recently created just 13s ago.
+
+kubectl get pods
