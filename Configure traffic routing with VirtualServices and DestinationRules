@@ -1,0 +1,118 @@
+Example approach
+1. Create a VirtualService to define the percentage of traffic that will be routed to your pods. It's up to you on where to create the file, it could either be created in the k8s or istio folder.
+
+$ nano ~/canary-deployments/istio/virtualservice.yaml
+ 
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  # The name is arbitrary and it's only to identify 
+  # and reference to the object within the cluster
+  name: api
+spec:
+  gateways:
+  - api # Ensure that you match exactly the name of the Gateway
+  hosts:
+  - "*"
+  http:
+  - route:
+    # Fun starts here.
+    - destination:
+        # 'host' defines the clusterIP service name
+        # to which the traffic will be routed to
+        host: api-stable # Send the traffic to api-stable ClusterIP
+      weight: 50 # Send 50% of the traffic to api-stable
+    
+    - destination:
+        host: api-canary # Send traffic to api-canary ClusterIP
+      weight: 50 # Send 50% of the traffic to api-canary
+ 
+# Save the file and exit
+2. Apply the configuration with kubectl
+
+$ kubectl apply -f ~/canary-deployments/istio/virtualservice.yaml
+virtualservice.networking.istio.io/api created
+ 
+# Ensure everything looks good
+$ kubectl  describe  vs api
+...        
+Spec:
+  Gateways:
+    api
+  Hosts:
+    *
+  Http:
+    Route:
+      Destination:
+        # 'Host' should match the ClusterIP service exactly
+        Host:  api-stable
+      Weight:  50
+      Destination:
+         # 'Host' should match the ClusterIP service exactly
+        Host:  api-canary
+      Weight:  50
+3. Click on your web server button and refresh the browser a couple of times. You should see that, on average, 50% of the requests are being served by api-stable and the other 50 are being served by api-canary .
+
+Here's an example of what you could expect.
+
+Request #1
+
+
+Request #2
+
+
+Note: You could get different results, as in, the same version might respond back to you more than once in a row and that would be perfectly acceptable. Remember that Istio tries to send 50% of the traffic to each service.
+
+4. Make it more realistic, and set the canary release to 20% of the traffic, and the stable release to 80%. In real-world scenarios, you would want your canary release to affect the least number of real users, so 20% in this case is a pretty high value, but it will do just fine to test this PoC. In a production environment, you could try setting canary releases somewhere from 1% to 10%, and stable releases somewhere between 90% to 99%. It all depends on how much risk the organization is willing to take.
+
+# Edit the ~/canary-deployments/istio/virtualservice.yaml file
+ 
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+ ...
+spec:
+  ...
+  http:
+  - route:
+ 
+    - destination:
+        host: api-stable
+      weight: 80 # Send 80% of the traffic to api-stable
+    
+    - destination:
+        host: api-canary
+      weight: 20 # Send 20% of the traffic to api-canary
+ 
+# Save the file and exit
+ 
+# Apply with kubectl
+$ kubectl apply -f ~/canary-deployments/istio/virtualservice.yaml
+virtualservice.networking.istio.io/api configured
+5. Go back to your browser and keep on refreshing. You should now see that the canary deployment will, on averag significantly receive fewer requests. You can keep reducing the weight on the canary release to 5% or 10% and you will see even fewer requests being sent to the canary deployment.
+
+Here's what you could see:
+
+Request #1
+
+
+Request #2
+
+
+Request #3
+
+
+Request #4
+
+
+Request #5
+
+
+Request #6
+
+
+Request #7
+
+
+Note: Remember that you could get different results and it would still make sense. The idea is that the canary release should now receive significantly fewer requests.
+
+Well done! You have enabled canary deployments in Kubernetes using Istio.
