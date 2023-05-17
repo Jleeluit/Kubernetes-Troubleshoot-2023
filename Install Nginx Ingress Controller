@@ -1,0 +1,62 @@
+Example approach
+The current cluster already has a traefik service that occupy the port 80. Since Nginx ingress controller also requires port 80, you must delete the traefik pod.
+
+Delete the traefik service name using the below command
+
+kubectl delete svc -n kube-system traefik
+
+Install the latest Nginx ingress controller using this terminal command. Replace the <version> with the latest controller release from this page.
+
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-<version>/deploy/static/provider/cloud/deploy.yaml 
+
+Wait for around 3 minutes and make sure the Nginx ingress controller pod is running. Use this terminal command and make sure the controller pod is READY
+
+kubectl get pods --namespace=ingress-nginx
+
+Check that Nginx is running at port 80 by using this command; you should get 404 not found from Nginx
+
+curl http://localhost
+
+Since you will expose the loan application through Nginx ingress controller, it is better to use Kubernetes service with type ClusterIP instead of LoadBalancer that was created on Task 1, as ClusterIP will make the loan application available only at the other pod on the Kubernetes cluster and will not expose it on public IP address.
+
+Create file service-loan-clusterip.yml using terminal command below
+
+nano service-loan-clusterip.yml
+
+Download and extract the reference code (file devsecops-nginx-02.zip) from the task resources. You will have the file service-loan-clusterip.yml. Copy and paste the content of the extracted yml file into your own service-loan-clusterip.yml. Notice that the type is ClusterIP
+
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: devsecops
+  name: devsecops-loan-clusterip
+  labels:
+    app.kubernetes.io/name: devsecops-loan
+spec:
+  selector:
+    app.kubernetes.io/name: devsecops-loan
+  type: ClusterIP
+  ports:
+  - port: 8111
+
+Press CTRL+X (Windows) or command+X (Mac) to exit. When asked to save the file, type Y
+
+
+And press Enter (Windows) or return (Mac) to save the modified file
+
+
+Apply the service-loan-clusterip.yml using the terminal command below
+
+kubectl apply -f service-loan-clusterip.yml
+
+Now you will have two services to expose loan application, which can be seen using the terminal command below
+
+kubectl get services -n devsecops
+
+You won't need the devsecops-loan-loadbalancer service, so delete it using the command below
+
+kubectl delete service -n devsecops devsecops-loan-loadbalancer
+
+Verify that you now have only one service to expose the loan application, which is ClusterIP. Use the command below
+
+kubectl get services -n devsecops
