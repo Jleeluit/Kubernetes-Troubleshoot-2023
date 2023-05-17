@@ -1,0 +1,156 @@
+Example approach
+Since you need to create different rules for loan and marketing, you must use two separated ingress rules. Delete the existing ingress rules.
+
+You can find the ingress rule name by using the following command
+
+kubectl get ingress -n devsecops
+
+Then delete the ingress rule by using command kubectl delete ingress -n devsecops <ingress-rule-name>
+
+So in this case, you can use:
+
+kubectl delete ingress -n devsecops devsecops-ingress-nginx
+To generate a basic username/password, you need to install apache2-utils using this command:
+
+sudo apt-get update
+sudo apt-get install -y apache2-utils
+
+
+Generate the username marketing-auth and use password marketing-password. Use htpasswd command like below:
+
+htpasswd -c auth marketing-user
+
+This will generate a file named auth on the current folder
+
+From the generated auth file, create a Kubernetes secret with the name marketing-auth in the namespace devsecops. Use the command below
+
+kubectl create secret generic marketing-auth -n devsecops --from-file=auth
+
+Create a new file for the loan's ingress rule using the below command
+
+nano ingress-nginx-loan.yml
+
+Download and extract the reference code (file devsecops-nginx-08.zip) from the task resources. Copy and paste the content of extracted yml file into your own ingress-nginx-loan.yml
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  namespace: devsecops
+  name: devsecops-ingress-nginx-loan
+  labels:
+    app.kubernetes.io/name: devsecops-ingress-nginx-loan
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3"
+    nginx.ingress.kubernetes.io/limit-rpm: "4"
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "1"
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      - path: /loan
+        pathType: Prefix
+        backend:
+          service:
+            name: devsecops-loan-clusterip
+            port:
+              number: 8111
+Press CTRL+X (Windows) or command+X (Mac) to exit. When asked to save the file, type Y
+
+
+And press Enter (Windows) or return (Mac) to save the modified file
+
+
+
+The ingress must have a specific name and label since you will have a dedicated ingress for the loan. Use the name devsecops-ingress-nginx-loan
+
+Set timeout to 3 seconds
+
+Set rate limit to 4 requests per minute. Total rate limit is limit-rpm * limit-burst-multiplier
+
+This ingress rule will be applied only to the traffic going to /loan/...
+
+Create a new file for marketing's ingress rule (not secured) using the command below
+
+nano ingress-nginx-marketing.yml
+
+From the extracted reference code (file devsecops-nginx-08.zip), copy and paste the content of extracted yml file into your own ingress-nginx-marketing.yml
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  namespace: devsecops
+  name: devsecops-ingress-nginx-marketing
+  labels:
+    app.kubernetes.io/name: devsecops-ingress-nginx-marketing
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      - path: /marketing
+        pathType: Prefix
+        backend:
+          service:
+            name: devsecops-marketing-clusterip
+            port:
+              number: 8222
+Press CTRL+X (Windows) or command+X (Mac) to exit. When asked to save the file, type Y
+
+
+And press Enter (Windows) or return (Mac) to save the modified file
+
+
+
+The ingress must have a specific name and label since you will have a dedicated ingress for marketing. Use the name devsecops-ingress-nginx-marketing
+
+This ingress rule will be applied only to the traffic going to /loan/...
+
+No annotations are defined in this ingress rule meaning no specific configuration is applied for /marketing/..., hence the ingress rule will only follow the global rule specified on Task 6
+
+Create a new file for the marketing's ingress rule (secured with a username/password) using the following command
+
+nano ingress-nginx-marketing-auth.yml
+
+From the extracted reference code (file devsecops-nginx-08.zip), copy and paste the content of extracted yml file into your own ingress-nginx-marketing-auth.yml
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  namespace: devsecops
+  name: devsecops-ingress-nginx-marketing-auth
+  labels:
+    app.kubernetes.io/name: devsecops-ingress-nginx-marketing-auth
+  annotations:
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: devsecops/marketing-auth
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      - path: /marketing/api/delay
+        pathType: Prefix
+        backend:
+          service:
+            name: devsecops-marketing-clusterip
+            port:
+              number: 8222
+Press CTRL+X (Windows) or command+X (Mac) to exit. When asked to save the file, type Y
+
+
+And press Enter (Windows) or return (Mac) to save the modified file
+
+
+
+The ingress must have a specific name and label since you will have a dedicated ingress for specific endpoint in marketing. Use the name devsecops-ingress-nginx-marketing-auth (there is -auth to differentiate from the marketing ingress on the previous step)
+
+This ingress rule requires a basic authentication type (username/password), where the credentials will be taken from the Kubernetes secret on the namespace devsecops, with the secret name marketing-auth (defined previously on Step 4)
+
+This ingress rule will be applied only to the traffic going to /marketing/api/delay.... Since the endpoint is more specific then the previous ingress rule (Step 6), this ingress rule will take precedence.
+
+Apply all three ingress rules
+
+kubectl apply -f ingress-nginx-loan.yml
+kubectl apply -f ingress-nginx-marketing.yml
+kubectl apply -f ingress-nginx-marketing-auth.yml
