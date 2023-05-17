@@ -1,0 +1,54 @@
+Example approach
+The Nginx ingress controller is only the tool. You need to define your ingress rule so the tool (Nginx) knows how to route traffic. You must route all incoming traffic with the pattern http://<nginx-address>/loan/...  (has prefix /loan) to the Kubernetes service with the name service-loan-clusterip (defined on the Task 2). Create the ingress rule by creating the file ingress-nginx.yml using this command below
+
+nano ingress-nginx.yml 
+
+Download and extract the reference code (file devsecops-nginx-03.zip) from the task resources. Copy and paste the content of extracted yml file into your own ingress-nginx.yml.
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  namespace: devsecops
+  name: devsecops-ingress-nginx
+  labels:
+    app.kubernetes.io/name: devsecops-ingress-nginx
+  annotations:
+    nginx.ingress.kubernetes.io/load-balance: "round_robin"
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      - path: /loan
+        pathType: Prefix
+        backend:
+          service:
+            name: devsecops-loan-clusterip
+            port:
+              number: 8111
+
+There are several important points:
+
+this YAML file creates an Ingress object
+
+annotations specifies additional metadata for the Ingress object, in this case the annotations are specific for the Nginx ingress controller. The nginx.ingress.kubernetes.io/load-balance: "round_robin" specifies that the Ingress Controller should use a round-robin load-balancing algorithm to distribute incoming requests across the backend Pods.
+
+the ingress controller class name should be used to handle this Ingress object. This must be nginx for the Nginx ingress controller
+
+the rules section specifies the set of routing rules for the ingress object. In this case, there is only one rule, which is for HTTP traffic. The paths field specifies a set of path-based routing rules. In this case, there is only one path-based routing rule, which specifies that requests to the /loan path should be routed to a particular backend service. The pathType field specifies how the path should be matched. Since it is set to "Prefix," the path should be matched as a prefix rather than an exact match, so everything starts with /loan will match this rule. The backend.service field specifies which Kubernetes service should handle requests that match the routing rule. In this case, the service will be used is devsecops-loan-clusterip which currently is listening on port 8111 (the ClusterIP on previous task)
+
+Press CTRL+X (Windows) or command+X (Mac) to exit. When asked to save the file, type Y
+
+
+And press Enter (Windows) or return (Mac) to save the modified file
+
+
+Apply the ingress rule using this command
+
+kubectl apply -f ingress-nginx.yml
+
+You can now access the loan application through Nginx. Try to hit this endpoint several times using the command below
+
+curl http://localhost/loan/api/hello
+
+Notice that the load balancer will redirect traffic to one of pods in turn, so you will get a response from either loan pod 1 or loan pod 2.
