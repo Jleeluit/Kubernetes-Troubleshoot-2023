@@ -1,0 +1,35 @@
+Example approach
+Loan API should timeout when it receives a slow API (more than 3 seconds). Test using this command to give a 4 seconds delay
+
+curl http://localhost/loan/api/delay/4
+
+Loan API must not timeout when it receives a fast API (less than 3 seconds). Test using this command to give a 2 seconds delay
+
+curl http://localhost/loan/api/delay/2
+
+Wait for at least one minute before continue
+
+Hit /loan/api/hello at least 5 times within one minute. At the 5th (sometimes 6th) attempt, you will be rejected because the rate limit is only 4 requests per minute. Repeat this command at least for 5 times
+
+curl http://localhost/loan/api/hello
+
+Wait for at least one minute before continuing
+
+Hit /loan/api/hello, and you will get the response below
+
+
+Marketing API should not timeout when it receives an API that is between 3-5 seconds. Use this command to give a 4 seconds delay
+
+curl http://localhost/marketing/api/delay/4
+
+At this point, you will receive an HTTP response of 401 Authorization Required, since the marketing/api/delay is secured with the username marketing-user and password marketing-password and you did not submit any credentials.
+
+Access /marketing/api/delay with the correct username/password combination, using this command
+
+curl -u marketing-user:marketing-password http://localhost/marketing/api/delay/4
+
+Since marketing API uses global Nginx timeout configuration (5 seconds timeout duration), a 4 second delay will not timeout.
+
+You should be able to hit marketing API many times within one minute, since there is no rate limit set up. Repeat this command as many as you like within one minute:
+
+curl http://localhost/marketing/api/hello 
