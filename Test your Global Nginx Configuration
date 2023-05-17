@@ -1,0 +1,44 @@
+Example approach
+Use the following curl command to check whether the HTTP request headers were added by Nginx and received by the loan application
+
+curl http://localhost/loan/api/echo
+
+Notice there are three additional request headers received by backend, as per requirement on Task 6
+
+Use the following curl command to check whether the HTTP request headers were added by Nginx and received by the marketing application
+
+curl http://localhost/marketing/api/echo
+
+Notice there are three additional request headers received by backend, as per requirement on Task 6
+
+Use the following curl command to check whether the HTTP response headers were added by Nginx and received by the client who called the loan API
+
+curl -I http://localhost/loan/api/hello
+
+Notice there are two additional response headers received by client, as per requirement on Task 6
+
+Use the following curl command to check whether the HTTP response headers were added by Nginx and received by the client who called the marketing API
+
+curl -I http://localhost/marketing/api/hello
+
+Notice there are two additional response headers received by the client, as per requirement on Task 6
+
+Use the following curl command to check whether a slow HTTP call will be timed out in the loan API. Use a 7 seconds delay
+
+curl http://localhost/loan/api/delay/7
+
+After around 5 seconds (might take slightly longer), connection will be timed out
+
+Use the following curl command to check whether a slow HTTP call will be timed out in the marketing API. Use a 6 seconds delay
+
+curl http://localhost/marketing/api/delay/6
+
+After around 5 seconds (might take slightly longer), connection will be timed out
+
+Use the following curl command to check whether a fast HTTP call will still be processed and not timed out in the loan API. Use a 3 seconds delay
+
+curl http://localhost/loan/api/delay/3
+
+Use the following curl command to check whether a fast HTTP call will still be processed and not timed out in the marketing API. Use a 4 seconds delay
+
+curl http://localhost/marketing/api/delay/4
