@@ -1,0 +1,118 @@
+Example approach
+Edit devsecops-loan.yml using the command below
+
+nano devsecops-loan.yml
+
+Reduce the replica to one and remove (or comment) the LoadBalancer service section as you already use ClusterIP to expose the loan application.
+
+
+Press CTRL+X (Windows) or command+X (Mac) to exit. When asked to save the file, type Y
+
+
+And press Enter (Windows) or return (Mac) to save the modified file
+
+
+Apply the yml file using the terminal command below. The loan application deployment will be updated
+
+kubectl apply -f devsecops-loan.yml
+
+Download and extract the reference code (file devsecops-nginx-04.zip) from the task reference code. You will have the file devsecops-marketing.yml. Create a yml file for Kubernetes declarative configuration using the following command
+
+nano devsecops-marketing.yml
+
+Copy the content of extracted devsecops-marketing.yml into your new file
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: devsecops
+  name: devsecops-marketing-deployment
+  labels:
+    app.kubernetes.io/name: devsecops-marketing
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: devsecops-marketing
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: devsecops-marketing
+        app.kubernetes.io/version: 1.0.0
+    spec:
+      containers:
+      - name: devsecops-blue
+        image: timpamungkas/devsecops-marketing:1.0.0
+        imagePullPolicy: Always
+        resources:
+          limits:
+            cpu: "0.3"
+            memory: 128M
+        ports:
+        - name:  http
+          containerPort: 8222
+          protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /marketing/actuator/health/readiness
+            port: 8222
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 5
+        livenessProbe:
+          httpGet:
+            path: /marketing/actuator/health/liveness
+            port: 8222
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 5
+  replicas: 1
+ 
+---
+ 
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: devsecops
+  name: devsecops-marketing-clusterip
+  labels:
+    app.kubernetes.io/name: devsecops-marketing
+spec:
+  selector:
+    app.kubernetes.io/name: devsecops-marketing
+  type: ClusterIP
+  ports:
+  - port: 8222
+
+Press CTRL+X (Windows) or command+X (Mac) to exit. When asked to save the file, type Y
+
+
+And press Enter (Windows) or return (Mac) to save the modified file
+
+
+There are two Kubernetes objects defined on the devsecops-marketing.yml file:
+
+deployment devsecops-marketing-deployment (red rectangle below) uses the docker image timpamungkas:/devsecops-marketing:1.0.0 for the pod image (yellow rectangle below). The pod is exposed at port 8222 (blue rectangle below). For pod health check (readiness & liveness), use the particular endpoints (green rectangles below). There will be one pod replica (purple rectangle below).
+
+
+The service devsecops-marketing-clusterip exposes the pod to port 8222 on host.
+
+
+Create Kubernetes objects by applying the yml file using the terminal command below. All two objects will be created.
+
+kubectl apply -f devsecops-marketing.yml
+
+To make sure all pods are re-created, restart the deployment using the following command
+
+kubectl rollout restart deployment -n devsecops
+
+Wait for around 3 minutes until the pod is ready. Verify that there is one loan pod and one marketing pod. They must be READY before continuing. Use this terminal command to check:
+
+kubectl get pod -n devsecops
+
+Make sure there are two ClusterIP services, one for loan and one for marketing. Use the following command
+
+kubectl get services -n devsecops
