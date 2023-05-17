@@ -1,0 +1,57 @@
+Example approach
+1. Locate the IngressGateway deployed in your cluster and find the labels that will be used in the Gateway config.
+
+$ kubectl  get  pods -n istio-system --show-labels
+
+It may look a bit messy, but you are interested in the pod with the istio-ingressgateway prefix. Once you find it, note down the value of the app label since it'll be used later. In this case, the value of the label app is istio-ingressgateway.
+
+2. Create a new file at ~/canary-deployments/istio/gateway.yaml  with the following content:
+
+$ nano ~/canary-deployments/istio/gateway.yaml
+apiVersion: networking.istio.io/v1alpha3
+# This shouldn't be confused with an IngressGateway
+kind: Gateway
+metadata:
+  # The name is arbitrary and it's only to identify 
+  # and reference to the object within the cluster
+  name: api
+spec:
+  selector:
+    # This should match exactly as the app label in the pod
+    # prefixed by istio-ingressgateway in the istio-system namespace. 
+    # (As found in the previous step)
+    app: istio-ingressgateway
+  servers:
+  - port:
+      number: 8080 # Port 8080 as requested by security
+      name: http
+      protocol: HTTP # HTTP protocol as requested in the task
+    hosts:
+    - "*"
+ 
+# Save the file and exit
+3. Apply the configuration using kubectl
+
+$ kubectl  apply -f ~/canary-deployments/istio/gateway.yaml
+gateway.networking.istio.io/api created
+ 
+# Get the gateway details and ensure that:
+# - Port is 8080
+# - Protocol is HTTP
+# - Selector matches the label that you previously discovered
+ 
+$ kubectl  describe gw api
+Name:         api
+Namespace:    default
+...
+Spec:
+  Selector:
+    App:  istio-ingressgateway # Label matching exactly
+  Servers:
+    Hosts:
+      *
+    Port:
+      Name:      http
+      Number:    8080 # 8080 port
+      Protocol:  HTTP # HTTP protocol
+Events:          <none>
