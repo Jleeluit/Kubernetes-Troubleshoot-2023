@@ -1,0 +1,92 @@
+Example approach
+Download and extract the reference code (file devsecops-nginx-06.zip) from the task reference code. You will have two files :
+
+ingress-nginx-configmap-config.yml
+
+ingress-nginx-configmap-headers.yml.
+
+
+
+Define the HTTP request/response headers on ingress-nginx-configmap-headers.yml
+
+Create a yml file for Kubernetes declarative configuration using the following command
+
+nano ingress-nginx-configmap-headers.yml
+
+Copy the content of extracted ingress-nginx-configmap-headers.yml into your new file
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-custom-request-headers    # A
+  namespace: ingress-nginx
+data:
+  nginx-request-time: $time_iso8601
+  nginx-source: mycompany-nginx
+  nginx-more-request-header: just-sample-dummy-header
+ 
+---
+ 
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-custom-response-headers   # B
+  namespace: ingress-nginx
+data:
+  nginx-response-time: $time_iso8601
+  nginx-version: $nginx_version 
+
+The orange part defines the Kubernetes ConfigMap object with name nginx-custom-request-headers. This ConfigMap name will be referred to on the next step. The ConfigMap contains data for the HTTP request headers requirement.
+
+The blue part defines another Kubernetes ConfigMap object with the name nginx-custom-response-headers which will also be referred to on the next step. The ConfigMap contains data for the HTTP response headers requirement. Values start with $ are Nginx built-in variables.
+
+Press CTRL+X (Windows) or command+X (Mac) to exit. When asked to save the file, type Y
+
+
+And press Enter (Windows) or return (Mac) to save the modified file
+
+
+Create the ConfigMap configuration using the following command
+
+kubectl apply -f ingress-nginx-configmap-headers.yml
+
+You can configure Nginx ingress controller globally, which means the configuration will be effective for all traffic. To do this, you need to create a Kubernetes ConfigMap for the ingress controller. Create a new file ingress-nginx-configmap-config.yml using the following command
+
+nano ingress-nginx-configmap-config.yml
+
+Copy the contents of extracted ingress-nginx-configmap-config.yml into your new file
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ingress-nginx-controller
+  namespace: ingress-nginx
+data:
+  proxy-set-headers: ingress-nginx/nginx-custom-request-headers   
+  add-headers: ingress-nginx/nginx-custom-response-headers
+  proxy-read-timeout: "5"
+
+The ConfigMap must be in the same namespace with Nginx ingress controller and have the same name with the Nginx ingress service name. Using the default installation on the Task 2; the namespace is ingress-nginx, and the ingress service name is ingress-nginx-controller
+
+To set a custom HTTP request header, you must use the key proxy-set-headers, where the value must refer to <namespace/configmap-name-for-request-headers> (defined on ingress-nginx-configmap-headers.yml, line #A)
+
+To set a custom HTTP response header, you must use the key add-headers, where the value must refer to <namespace/configmap-name-for-response-headers> (defined on ingress-nginx-configmap-headers.yml, line #B)
+
+To set a global timeout when waiting for a response, you must use the key proxy-read-timeout with the value being the duration of the timeout in seconds quoted, e.g. : "<duration>"
+
+Press CTRL+X (Windows) or command+X (Mac) to exit. When asked to save the file, type Y
+
+
+And press Enter (Windows) or return (Mac) to save the modified file
+
+
+Apply the configuration using the command below
+
+kubectl apply -f ingress-nginx-configmap-config.yml
+
+Restart the Nginx ingress controller
+
+
+Get the Nginx deployment name using the command kubectl get deployment -n ingress-nginx
+
+Restart the Nginx using command kubectl rollout restart deployment -n ingress-nginx <deployment-name>. Replace <deployment-name> with the name you got from the step above.
