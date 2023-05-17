@@ -1,0 +1,79 @@
+Example approach
+1. Create the new canary deployment. To do this, create a new file called app-canary-deployment.yaml  at ~/canary-deployments/k8s . The only change that is required - as compared to api-stable - is that the lifecycle label should be set to canary instead of stable.
+
+$ nano ~/canary-deployments/k8s/app-canary-deployment.yaml
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-canary
+spec:
+  replicas: 3 # Add more replicas, just for fun.
+  selector:
+    matchLabels:
+      app: api
+      lifecycle: canary # Ensure the lifecycle label is set to canary
+  template:
+    metadata:
+      labels:
+        app: api
+        lifecycle: canary # Ensure the lifecycle label is set to canary
+ 
+    spec:
+      containers:
+      - name: api
+        image: hashicorp/http-echo
+        args:
+          - -listen=:8080
+          # Add the expected response as requested in the task
+          - -text={'runs_on':'kubernetes','lifecycle':'canary','api_version':'v2'}
+ 
+# Apply the config
+$ kubectl  apply -f ~/canary-deployments/k8s/app-canary-deployment.yaml
+deployment.apps/api-canary created
+2. Create a ClusterIP service named api-canary and ensure that the selector picks up the new pods.
+
+$ nano ~/canary-deployments/k8s/app-canary-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-canary # Name as suggested in the task description
+spec:
+  type: ClusterIP
+  selector:
+    app: api
+    lifecycle: canary # Use the canary label, instead of the stable one.
+  ports:
+    - protocol: TCP
+      port: 80 # Ensure port 80 is exposed for this service
+      targetPort: 8080 # This is the container port, which runs on port 8080
+ 
+# Apply the config with kubectl
+$ kubectl  apply -f ~/canary-deployments/k8s/app-canary-service.yaml
+service/api-canary created
+3. Ensure that both of the deployments are running. The stable deployment should have two replicas and the canary deployment should have three.
+
+# Check stable
+$ kubectl get pods -l app=api,lifecycle=stable
+NAME                          READY   STATUS    RESTARTS   AGE
+api-stable-69c67686f8-bjq8w   1/1     Running   0          17m
+api-stable-69c67686f8-zt8qg   1/1     Running   0          17m
+ 
+# Check canary
+kubectl get pods -l app=api,lifecycle=canary
+NAME                         READY   STATUS    RESTARTS   AGE
+api-canary-b474c478f-ctp4c   1/1     Running   0          2m54s
+api-canary-b474c478f-sjzjr   1/1     Running   0          2m54s
+api-canary-b474c478f-s79tz   1/1     Running   0          2m54s
+4. Ensure that you can access the new canary release using the api-canary service.
+
+# This will port-forward port 80 from the service to port 8080 on your workspace.
+$ kubectl port-forward service/api-canary 8080:80 --address='0.0.0.0'
+Forwarding from 0.0.0.0:8080 -> 8080
+Click on the web server button to see the response from the service:
+
+
+If everything went well, you should receive a response from the pods, through the service that you created. Please ensure that you can see a response that resembles the one below before moving forward.
+
+
+Note: Ensure that you release port 8080 from your workspace by pressing CRTL+C, on your workspace, to exit the port-forward session.
