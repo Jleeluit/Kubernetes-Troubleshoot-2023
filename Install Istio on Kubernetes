@@ -1,0 +1,43 @@
+Example approach
+1. Create a directory to create a logical distinction between Istio and Kubernetes.
+
+$ mkdir -p ~/canary-deployments/istio
+ 
+# Ensure that you change to the new directory
+cd ~/canary-deployments/istio
+2. Download Istio 1.17.0 as described in the task.
+
+$ curl -L https://istio.io/downloadIstio | ISTIO_VERSION=1.17.0 TARGET_ARCH=x86_64 sh -
+...
+Istio 1.17.0 Download Complete!
+Istio has been successfully downloaded into the istio-1.17.0 folder on your system.
+...
+ 
+# Ensure the download was successful
+$ ls
+istio-1.17.0
+3. Move the istioctl binary to /usr/local/bin  so that you can start with the installation
+
+$ sudo mv ~/canary-deployments/istio/istio-1.17.0/bin/istioctl /usr/local/bin
+ 
+# Ensure that you can interact with the istioctl tool
+$ istioctl version
+no running Istio pods in "istio-system"
+1.17.0
+4. Before installing Istio, you need to ensure that the custom config that was provided by the security team exists as a file, so that you can pass it to Istio during the installation. To do that, create a file in the  ~/canary-deployments/istio/ folder with the contents of the istio-security-config.yaml
+
+$ nano ~/canary-deployments/istio/istio-security-config.yaml
+# Paste the content of the asset istio-security-config.yaml
+# Save the file and exit
+5. Start the Istio installation and provide the custom config file that was provided by the security team.
+
+$ istioctl install -f ~/canary-deployments/istio/istio-security-config.yaml -y
+✔ Istio core installed                                                                                                                                                                             
+✔ Istiod installed                                                                                                                                                                                 
+✔ Ingress gateways installed                                                                                                                                                                       
+✔ Installation complete                                                                                                                                                                            Making this installation the default for injection and validation.
+6. To verify that the installation was successful, check the pods and services of the istio-system namespace. All pods should be running and a LoadBalancer type service - named istio-ingressgateway - should exist with its respective external IP.
+
+$ kubectl  get pods,svc -n istio-system
+
+Note: If for some reason the EXTERNAL-IP for the istio-ingressgateway appears as <pending> or <none> it's probably because the port 8080 on your namespace is in use. If that's the case, ensure that you stop any services that you might have started on port 8080.
