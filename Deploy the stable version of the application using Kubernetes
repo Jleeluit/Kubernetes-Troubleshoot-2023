@@ -1,0 +1,63 @@
+Example approach
+1. Create a directory for Kubernetes to better organize the project.
+
+# Create a main directory named "canary-deployments" with a k8s subdirectory.
+$ mkdir ~/canary-deployments/k8s -p
+2. Create a new file with the content of the app-stable-deployment.yaml asset.
+
+$ nano ~/canary-deployments/k8s/app-stable-deployment.yaml
+ 
+# Copy and paste the content of the app-stable-deployment.yaml asset
+ 
+# Save the file and exit 
+3. Apply the file to Kubernetes using kubectl
+
+$ kubectl apply -f ~/canary-deployments/k8s/app-stable-deployment.yaml
+deployment.apps/api-stable created
+ 
+# Ensure that the pods were created
+$ kubectl get pods
+...
+api-stable-cc7476bd8-9g9j2   1/1     Running   0          8s
+api-stable-cc7476bd8-2f6cs   1/1     Running   0          8s
+4. Create the ClusterIP that will allow other services to communicate with these pods.
+
+# Create a new file for the service definition with the following content
+$ nano ~/canary-deployments/k8s/app-stable-service.yaml
+ 
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-stable
+spec:
+  type: ClusterIP
+  selector:
+    app: api
+    lifecycle: stable
+  ports:
+    - protocol: TCP
+      port: 80 # Ensure port 80 is exposed for this service
+      targetPort: 8080 # This is the container port, which runs on port 8080
+ 
+# Save the file and exit
+ 
+# Create the service
+$ kubectl apply -f ~/canary-deployments/k8s/app-stable-service.yaml
+service/api-stable created
+ 
+# Check the service
+$ kubectl get svc 
+...
+api-stable         ClusterIP   10.43.221.160   <none>        80/TCP    37m
+5. Make sure the service works as expected, you can use kubectl port-forward to test this.
+
+# This will port-forward port 80 from the service to port 8080 on your workspace.
+$ kubectl port-forward service/api-stable 8080:80 --address='0.0.0.0'
+Forwarding from 0.0.0.0:8080 -> 8080
+Click on the webserver button to see the response from the service:
+
+
+If everything went well, you should receive a response from the pods, through the service that you created. Please ensure that you can see a response that resembles the one below before moving forward.
+
+
+Note: Ensure that you release port 8080 from your workspace by pressing CRTL+C, on your workspace, to exit the port-forward session.
