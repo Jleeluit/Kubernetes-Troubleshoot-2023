@@ -1,0 +1,437 @@
+Create Users in Kubernetes
+
+Example approach
+Note: This task will use self-signed certificates as a way of authenticating users to Kubernetes.
+
+1. Create a directory for the team and the user. This is not a requirement, but it simplifies and logically organizes teams and users.
+
+$ mkdir -p ~/teams/development/john
+2. Create a private key for the user John using OpenSSL.
+
+# Changes directory
+$ cd ~/teams/development/john
+ 
+# Creates the private key
+$ openssl genrsa -out john.key 2048
+Generating RSA private key, 2048 bit long modulus (2 primes)
+...
+$ ls -l
+john.key # You should see the key here
+3. Create a certificate signing request. You do this to let Kubernetes know that you'd like to trust this new john.key  certificate, so that it can log in and access the cluster as a valid user.
+
+$ cd ~/teams/development/john
+ 
+# Create file that holds the certificate signing request
+## Note how the group is passed in the form of "/O=GROUP_NAME"
+$ openssl req -new -key john.key -out john.csr -subj "/CN=john/O=development"
+ 
+# Check that the csr file was created
+$ ls
+john.csr  john.key # See john.csr
+4. Create a CertificateSigningRequest object in Kubernetes to request the approval of the new certificate for John.
+
+$ cat <<EOF | kubectl create -f -
+apiVersion: certificates.k8s.io/v1
+kind: CertificateSigningRequest
+metadata:
+  name: john-development # Any name can be used here. 
+spec:
+  signerName: kubernetes.io/kube-apiserver-client
+  groups:
+  - system:authenticated
+  ### Be sure to pass the correct file name.
+  request: $(cat john.csr | base64 | tr -d '\n')
+  usages:
+  - digital signature
+  - key encipherment
+  - client auth
+EOF
+ 
+# Check the CertificateSigningRequest objects. You will see more fields
+# in the output, but below are the important ones
+$ kubectl get CertificateSigningRequest
+NAME               REQUESTOR        CONDITION
+john-development  system:admin     Pending # This should be "Pending"
+5. Now that you as a Kubernetes admin have sent a request to approve the "creation of the user John" - or more specifically, the approval of his certificate - it's time to approve the request. 
+
+# Approve the request
+$ kubectl certificate approve john-development
+ 
+# Ensure that the certificate was approved and issued
+$ kubectl get CertificateSigningRequest
+NAME               REQUESTOR        CONDITION
+john-development  system:admin     Approved,Issued # This should be "Approved, Issued"
+ 
+# Retrieve the generated certificate for John
+$ cd ~/teams/development/john
+ 
+$ kubectl get csr john-development -o jsonpath='{.status.certificate}'  | base64 -d > john.crt
+ 
+# The content of the certificate should look like below
+$ cat john.crt 
+-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----
+6. Congrats! You have successfully granted John access to the Kubernetes cluster. It's time to configure the access for John using the certificates that you approved above.
+
+$ cd ~/teams/development/john
+ 
+# Configure the certificates for the user john
+$ kubectl config set-credentials john \
+  --client-certificate=$PWD/john.crt \
+  --client-key=$PWD/john.key
+ 
+# Add John as a new "user" - to be more specific, it'll be added as a kubernetes context to your kubeconfig file.
+$ kubectl config set-context john \
+  --cluster=default \
+  --user=john
+ 
+# List the available "users" (contexts) in your system and you should now see john's one poping up.
+$ kubectl  config get-contexts
+CURRENT   NAME      CLUSTER   AUTHINFO   NAMESPACE
+*         default   default   default    
+          john      default   john    
+7. Switch to the "john" context and try to access any resource in Kubernetes.
+
+$ kubectl config use-context john 
+Switched to context "john".
+ 
+# Check your current context
+$ kubectl  config get-contexts
+CURRENT   NAME      CLUSTER   AUTHINFO   NAMESPACE
+          default   default   default    
+ *        john      default   john    
+ 
+$ kubectl  get pods 
+Error from server (Forbidden): pods is forbidden: User "john" cannot list resource "pods" in API group "" in the namespace "default"
+It's important to notice that the error clearly states: User "john" cannot list resource "XYZ", which means that John is a valid user within Kubernetes but needs some additional configuration in terms of permissions.  But, the main goal of this task was to create a valid user, and it's now done!
+
+If you receive an error with a different message, please check that you followed all the steps as defined above.
+
+Note: Since John doesn't have any permissions, yet, switch back to the admin context.
+
+$ kubectl config use-context default
+$ kubectl  config get-contexts
+CURRENT   NAME      CLUSTER   AUTHINFO   NAMESPACE
+*         default   default   default    
+          john      default   john    
+          
+          
+Create a Namespace for the Team and Grant RBAC Permissions to Users
+In this task, you will create a namespace that will isolate all the resources of the development team.  You need to ensure that John can access ONLY the development namespace. Additionally, you need to ensure that John is able to perform ALL operations on Deployments, ReplicaSets and Pods.
+
+John MUST NOT be able to perform any operations on any resources other than the ones mentioned above. For example, John shouldn't be able to create configmaps or secrets - you can test this by trying to create a dummy configmap/secret and it should result in an error. 
+          
+          
+          Example approach
+1. Create the development namespace. Ensure that you run these commands as the admin user.
+
+$ kubectl config use-context default
+Switched to context "default".
+ 
+# Ensure you're using the default context
+$ kubectl  config get-contexts
+CURRENT   NAME      CLUSTER   AUTHINFO   NAMESPACE
+*         default   default   default    
+          john      default   john
+ 
+# Create the namespace
+$ nano ~/teams/development/k8s.yaml
+ 
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: development
+ 
+# Save the file and exit
+ 
+# Apply with kubectl
+$ kubectl apply -f ~/teams/development/k8s.yaml
+namespace/development created
+2. Create a role that describes the permissions that the user John will have. Remember these permissions should be scoped to the development namespace.
+
+$ nano ~/teams/development/k8s.yaml
+...
+kind: Namespace
+...
+--- # Add these three hyphens to add a new object definition
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: development        # Scoped namespace
+  name: development-team        # An arbitrary name
+rules:
+- apiGroups: ["", "extensions", "apps"]
+ 
+  # Allow ONLY these resources
+  resources: ["deployments", "replicasets", "pods"]
+ 
+  # Allow ALL operations on the above resources
+  verbs: ["*"]
+ 
+# Save the file and exit
+3. Bind the role that you created above with the development group that you configured when you created the certificates for John. It's important to bind the role to the group "development" so that you can add more users to this group in the future.
+
+$ nano ~/teams/development/k8s.yaml
+...
+kind: Role
+metadata:
+  namespace: development        # Scoped namespace
+  name: development-team        # An arbitrary name
+...
+--- # Add a new object
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  namespace: development      # Allowed namespace
+  name: development-team      # An arbitrary name
+subjects:
+- kind: Group
+  name: development          # development group here
+  apiGroup: "rbac.authorization.k8s.io"
+roleRef:
+  kind: Role
+  name: development-team      # role name here
+  apiGroup: rbac.authorization.k8s.io
+ 
+# Save the file and exit
+ 
+# Apply the config
+ 
+$ kubectl apply -f ~/teams/development/k8s.yaml
+...
+role.rbac.authorization.k8s.io/development-team created
+rolebinding.rbac.authorization.k8s.io/development-team created
+4. Become John and test the permissions. Remember that you granted permissions to Deployments, ReplicaSets and Pods ONLY within the development namespace.
+
+$ kubectl config use-context john
+Switched to context "john".
+ 
+# Ensure that you became John
+kubectl  config get-contexts
+CURRENT   NAME      CLUSTER   AUTHINFO   NAMESPACE
+          default   default   default    
+*         john      default   john     
+ 
+# Test permissions on the development namespace
+$ kubectl get deploy,rs,pods -n development
+No resources found in development namespace. # Works!
+ 
+# Test permissions for something other than deploy,rs,pods for John
+$ kubectl get cm,secrets -n development
+ 
+# John shouldn't be able to access configmaps or secrets
+Error from server (Forbidden): configmaps is forbidden ...
+Error from server (Forbidden): secrets is forbidden ...
+ 
+# Test the permisions on another namespace
+$ kubectl get deploy,rs,pods -n default
+ 
+# John shouldn't be able to access resources that belong to other namespaces
+Error from server (Forbidden): deployments.apps is forbidden ...
+Error from server (Forbidden): replicasets.apps is forbidden ...
+Error from server (Forbidden): pods is forbidden ...
+
+K8s.yaml file 
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: development
+--- # Add these three hyphens to add a new object definition
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  namespace: development        # Scoped namespace
+  name: development-team   # An arbitrary name
+rules:
+- apiGroups: ["", "extensions", "apps"]
+
+  # Allow ONLY these resources
+  resources: ["deployments", "replicasets", "pods"]
+
+  # Allow ALL operations on the above resources
+  verbs: ["*"]
+--- # Add a new object
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  namespace: development
+  name: development-team
+subjects:
+- kind: Group
+  name: development # development group here
+  apiGroup: "rbac.authorization.k8s.io"
+roleRef:
+  kind: Role
+  name: development-team # role name here
+  apiGroup: rbac.authorization.k8s.io
+
+
+STEP 3. Limit the Amount of Resources and Pods in the Development Namespace
+
+In this task, you will ensure that John or any other member can't consume all the cluster resources. This means, that you will have to constrain the development team to 32Mi of RAM and 20m of CPU per pod. If a pod wants to use more than that, its creation should fail.
+
+To ensure that everything works as expected, create a dummy deployment using the nginx:alpine image, and ensure that the conditions mentioned above are enforced.
+
+
+         Example approach
+1. Ensure that you become the admin user to be able to create the restrictions in the namespace.
+
+$ kubectl config use-context default
+Switched to context "default".
+2. Create the constraints in the development namespace with 20m for CPU and 32Mi for RAM.
+
+$ nano ~/teams/development/k8s.yaml
+...
+kind: RoleBinding
+metadata:
+  namespace: development
+  name: deployment-team
+...
+---  # Add a new object to limit the resources
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: development-limits # Arbitrary name
+  namespace: development   # Namespace to constrain
+spec:
+  limits:
+    - type: "Container"
+      max:
+        cpu: 20m
+        memory: 32Mi
+ 
+# Save and exit
+ 
+# Apply using kubectl
+$ kubectl apply -f ~/teams/development/k8s.yaml
+...
+limitrange/development-limits created
+3. Create a deployment to test that the development team is constrained in terms of pod resources. This deployment will ask for more CPU and RAM than the values allowed in the constraint, and it should fail.
+
+$ nano ~/teams/development/pods-demo.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment-test
+  namespace: development # development namespace
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: deployment-test
+  template:
+    metadata:
+      labels:
+        app: deployment-test
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:alpine # Use a tiny image
+        resources:
+          requests:
+            cpu: 100m       # Ask for lots of cpu
+            memory: 200Mi   # Ask for lots of RAM
+ 
+# Save the file and exit
+ 
+# Apply the file with kubectl as John
+$ kubectl config use-context john
+Switched to context "john".
+ 
+$ kubectl apply -f ~/teams/development/pods-demo.yaml
+deployment.apps/deployment-test created
+ 
+# Ensure that the pods are not created, because the violate the contraints
+$ kubectl get -f ~/teams/development/pods-demo.yaml -o yaml
+status:
+  conditions:
+  ...
+    message: 'Pod "deployment-test-56c87dc4d5-nx58b" is invalid: [spec.containers[0].resources.requests:
+      Invalid value: "100m": must be less than or equal to cpu limit, spec.containers[0].resources.requests:
+      Invalid value: "200Mi": must be less than or equal to memory limit]'
+4. Provide valid values to ensure that members of the development team can create pods within the enforced limits.
+
+$ nano ~/teams/development/pods-demo.yaml
+apiVersion: apps/v1
+kind: Deployment
+...
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:alpine # Use a tiny image
+        resources:
+          requests:
+            cpu: 10m       # Ask for cpu within the limits
+            memory: 10Mi   # Ask for ram within the limits
+ 
+# Save the file and exit
+ 
+# Apply with kubectl
+$ kubectl apply -f ~/teams/development/pods-demo.yaml
+ 
+# Check the pods
+$ kubectl  get pods -n development
+ 
+# Works@
+NAME                               READY   STATUS    RESTARTS   AGE
+deployment-test-6647479965-7jhd5   1/1     Running   0          19s
+deployment-test-6647479965-jgd64   1/1     Running   0          10s
+
+
+STEP4 Limit the Amount of Pods Running in the Development Namespace
+In this task, you will ensure that the development team can't create more than 5 pods at a time in the development namespace. This is to respect resources in the cluster and prevent one team from using all of the available resources.
+
+To test that it works, apply the rule as the admin user and the login as "John" to create more than 5 pods. If the rule works correctly, John won't be able to create 6 pods at a time.
+
+Example approach
+1. Ensure that you run these commands as the admin user
+
+$ kubectl config use-context default
+Switched to context "default".
+2. Modify the k8s.yaml file and add a resource quota to limit the number of pods in the development namespace.
+
+$ nano ~/teams/development/k8s.yaml
+--- # Add a new component at the end of the file
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: development-pods-limits
+  namespace: development
+spec:
+  hard:
+    pods: "5"
+# Save the file and exit
+ 
+# Apply the config
+$ kubectl apply -f ~/teams/development/k8s.yaml
+...
+resourcequota/development-pods-limits created
+3. Become John and test the new constraint by creating 6 pods with the below command:
+
+$ for i in {1..6}; do kubectl -n development run max-pods-$i --image=nginx:alpine ; done
+ 
+pod/max-pods-1 created
+pod/max-pods-2 created
+pod/max-pods-3 created
+Error from server (Forbidden): pods "max-pods-4" is forbidden: exceeded quota
+Error from server (Forbidden): pods "max-pods-5" is forbidden: exceeded quota
+ 
+# Check how many pods were actually created
+$ kubectl  get pods -n development
+NAME                               READY   STATUS    RESTARTS      AGE
+deployment-test-6647479965-7jhd5   1/1     Running   1 (38m ago)   42h
+deployment-test-6647479965-jgd64   1/1     Running   1 (38m ago)   42h
+max-pods-1                         1/1     Running   0             98s
+max-pods-2                         1/1     Running   0             98s
+max-pods-3                         1/1     Running   0             98s
+You can see that only 3 pods were created because there were two pods from previous tasks. The total is 5, and any attempt of creating a new pod in the "development" namespace will end up throwing an error since the limit of 5 pods is already met.
+
+
+
+Congratulations! You have just configured multitenancy in a Kubernetes cluster, allowing different teams to securely and separately live in different namespaces with rules that will enforce limits per team.
+
+
+        
+         
