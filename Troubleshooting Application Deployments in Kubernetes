@@ -1,0 +1,219 @@
+STEP1. Analyze the Environment
+
+Example approach
+1. Run the ls -l command to see the contents of the base directory of the lab environment. Ensure that a folder named scenarios-folder is present.
+
+ls -l
+
+2. Run the cd command to go inside the directory.
+
+cd scenarios-folder
+
+3. Run the ls -l command to explore the files that are part of the folder. Ensure you see all the scenario-related text files.
+
+Troubleshoot Scenario 1
+Check the contents of the Troubleshooting Scenario 1 (scenario-1.txt) and solve the issue.
+
+
+Example approach
+1. Check the contents of the scenario-1.txt file to understand the problem statement as part of Troubleshooting Task 1.
+
+cat scenario-1.txt
+
+2. Find the pod named "troubleshoot-pod" in the Kubernetes cluster.
+
+kubectl get pods --all-namespaces --selector=run=troubleshoot-pod
+
+3. Check the events associated with Pod to understand the cause of failure. After running kubectl describe, scroll down to the Events section to get the Pod events.
+
+kubectl describe pod troubleshoot-pod -n staging-env
+
+From the events, we can analyze that Pod is launched based on "ninx" image and Kubernetes is failing to pull the image as the repository does not exist. Here we can identify that there is a typo; instead, the image should have been nginx.
+
+4. Run the kubectl edit to directly edit the Pod resource to fix the typo issue.
+
+kubectl edit pod troubleshoot-pod -n staging-env
+
+5. Under the spec -> containers - image, we can identify the typo "ninx"
+
+6. Fix the typo and update the image name to nginx. Save the file (note: this has opened using Vi editor, hence saving the file requires pressing ESC and wq!)
+
+7. Once the file is saved, you will get a message stating that the pod is edited.
+
+8. Verify if the Pod is running.
+
+kubectl get pods -n staging-env
+
+
+Troubleshoot Scenario 2
+Check the contents of the Troubleshooting Scenario 2 (scenario-2.txt) and solve the issue.
+
+Example approach
+1. Check the contents of the scenario-2.txt file to understand the problem statement as part of Troubleshooting Task 2.
+
+cat scenario-2.txt
+
+2. Find the Pod in the cluster and the namespace in which it is running.
+
+kubectl get pods --all-namespaces
+
+From the above step, we can identify that a Pod named "troubleshoot-scenario-2-pod" is running in the default namespace.
+
+3. Verify if the Pod is running in the default namespace.
+
+kubectl get pods
+
+From this step, we can also identify that the Pod is in Pending Status.
+
+4. Check the events associated with Pod to understand the cause of failure. After running kubectl describe, scroll down to the Events section to get the Pod events.
+
+kubectl describe pod troubleshoot-scenario-2-pod
+
+From the events, we can analyze that the error is caused due to "Insufficient cpu" and no nodes are matching the CPU requests and limits that are set at the Pod level.
+
+5. Get the Pod manifest and store it in a file so that we can edit the resource to resolve it.
+
+kubectl get pod troubleshoot-scenario-2-pod -o yaml > scenario-2-solution.yaml
+
+6. Open the file where the Pod manifest is stored.
+
+nano scenario-2-solution.yaml
+
+7. Identify the requests and limits-related details in the Pod manifest. We see that memory of 2Gi and 4Gi are set as part of requests and limits and also certain CPU requirements.
+
+8. Since the scenario clearly states that we are free to modify the manifest as required to resolve the issue, let us remove the specific resources section from the Pod manifest.
+
+Save the file in nano using CTRL+O and exit using CTRL+X
+
+9. Delete the Pod so that we can recreate the Pod using the latest manifest.
+
+kubectl delete pod troubleshoot-scenario-2-pod
+
+10. Create a new Pod from the manifest that we have created.
+
+kubectl apply -f scenario-2-solution.yaml
+
+11. Verify if the Pod is running.
+
+kubectl get pods
+
+
+
+Troubleshoot Scenario 3
+Check the contents of the Troubleshooting Scenario 3 (scenario-3.txt) and solve the issue.
+Example approach
+1. Check the contents of the scenario-3.txt file to understand the problem statement as part of Troubleshooting Task 1.
+
+cat scenario-3.txt
+
+2. Find the service using the kubectl get service command.
+
+3. Describe the service to understand the issue.
+
+kubectl describe service kplabs-service
+
+From the above screenshot, we can understand that there is a selector of env=stage and there are no endpoints that are added.
+
+4. Find the deployment named nginx-deployment and check which namespace it is running.
+
+kubectl get deployments --all-namespaces
+
+From the above screenshot, we can identify that nginx-deployment is running in stage-ns namespace.
+
+5. Verify whether the deployment has the same set of labels that are part of the selector in kplabs-service. Ensure that label of env=stage is present.
+
+kubectl describe deployment nginx-deployment -n stage-ns
+
+7. Download the service resource manifest to a file. We will modify the namespace of service to ensure it is running in the same namespace as that of the deployment.
+
+kubectl get service kplabs-service -o yaml > scenario-3-solution.yaml
+
+8. Verify if the manifest is available in the file.
+
+cat scenario-3-solution.yaml
+
+9. Open the yaml file where the manifest is stored.
+
+nano scenario-3-solution.yaml
+
+10. Change the namespace from default to stage-ns. Once edited, save the file.
+
+11. Delete the existing service from the default namespace.
+
+kubectl delete service kplabs-service
+
+12. Create a new service resource from the yaml file.
+
+kubectl apply -f scenario-3-solution.yaml
+
+13. Verify if the service is created successfully in the stage-ns namespace.
+
+kubectl get service -n stage-ns
+
+14. Check whether the endpoints are populated for service. There should be a total of 3 IPs in the endpoints.
+
+kubectl describe service -n stage-ns
+
+Also, take note of the Service IP. In my case, it is 10.43.207.30.
+
+15. Send a curl request to service-ip to ensure if you are getting the application response.
+
+curl <service-ip>
+
+
+
+Troubleshoot Scenario 4
+Check the contents of the Troubleshooting Scenario 4 (scenario-4.txt) and solve the issue.
+
+Example approach
+1. Check the contents of the scenario-4.txt file to understand the problem statement as part of Troubleshooting Task 1.
+
+cat scenario-4.txt
+
+2. Check the directory contents and ensure that the deployment.yaml file is present.
+
+ls -l
+
+3. Try creating resources from deployment.yaml file to see if it generates.
+
+kubectl apply -f deployment.yaml
+
+At this stage, we get an error stating "prod-deployment" namespace not found.
+
+4. Create a new namespace called prod-deployment to fix the above error.
+
+kubectl create namespace prod-deployment
+
+5. Try creating resources from deployment.yaml file to see if it gets created.
+
+kubectl apply -f deployment.yaml
+
+This time we got an error related to the selector not matching the labels.
+
+6. Open the deployment.yaml file in a text editor.
+
+nano deployment.yaml
+
+
+7. Check the contents of labels and selectors. Verify whether they match or not.
+
+In the above screenshot, we can see the labels and selectors have different values.
+
+Labels -->    env : production
+Selector --> app: production
+metadata.labels --> app: production
+
+
+8. Ensure that all labels and selectors have the same set of values.
+
+In this example, we have set it to env: production
+
+Once completed, save and close the file.
+
+9. Verify if you are able to create a deployment from the manifest file.
+
+kubectl apply -f deployment.yaml
+
+13. Ensure that the deployment is successfully running.
+
+kubectl get deployments -n prod-deployment
