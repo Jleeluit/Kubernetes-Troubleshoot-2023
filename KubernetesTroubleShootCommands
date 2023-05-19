@@ -1,0 +1,35 @@
+When troubleshooting Kubernetes, you can use various commands to gather information, inspect resources, and diagnose issues. Here are some useful commands for troubleshooting Kubernetes:
+
+kubectl cluster-info: Provides information about the cluster, including the Kubernetes master's URL and the cluster's version.
+
+kubectl get pods: Lists all pods in the current namespace. Use the -n <namespace> flag to specify a different namespace.
+
+kubectl describe pod <pod-name>: Retrieves detailed information about a specific pod, including its current state, events, and related resources.
+
+kubectl logs <pod-name>: Displays the logs of a specific pod. Use the -f flag to stream the logs in real-time.
+
+kubectl exec -it <pod-name> -- <command>: Executes a command inside a running container within a pod. It allows you to troubleshoot and inspect the container's environment interactively.
+
+kubectl get nodes: Lists all the nodes in the cluster along with their status and resource usage.
+
+kubectl describe node <node-name>: Retrieves detailed information about a specific node, including its capacity, allocated resources, and conditions.
+
+kubectl get events: Displays cluster events such as pod scheduling, deletions, and errors.
+
+kubectl get services: Lists all services in the current namespace. Use the -n <namespace> flag to specify a different namespace.
+
+kubectl describe service <service-name>: Retrieves detailed information about a specific service, including its endpoints and associated resources.
+
+kubectl get deployments: Lists all deployments in the current namespace. Use the -n <namespace> flag to specify a different namespace.
+
+kubectl describe deployment <deployment-name>: Retrieves detailed information about a specific deployment, including its replicas, pods, and rollout history.
+
+kubectl get configmaps: Lists all config maps in the current namespace. Use the -n <namespace> flag to specify a different namespace.
+
+kubectl describe configmap <configmap-name>: Retrieves detailed information about a specific config map, including its data and associated resources.
+
+kubectl get pv: Lists all persistent volumes in the cluster.
+
+kubectl describe pv <pv-name>: Retrieves detailed information about a specific persistent volume, including its capacity, access modes, and reclaim policy.
+
+These are just a few examples of commonly used commands for troubleshooting Kubernetes. Remember to customize the commands by providing the relevant resource names, namespaces, or other flags as needed to troubleshoot specific issues.
